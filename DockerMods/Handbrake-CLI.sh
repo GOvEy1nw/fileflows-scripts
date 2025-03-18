@@ -1,55 +1,66 @@
-# ----------------------------------------------------------------------------------------------------
-# Name: HandBrake-CLI
-# Description: HandBrake is an open-source video transcoder that allows you to convert videos into different formats.
-# Author: GOvEy1nw
-# Revision: 1
-# Icon:
-# ----------------------------------------------------------------------------------------------------
-
 #!/bin/bash
 
-# Function to handle errors
-function handle_error {
-    echo "An error occurred. Exiting..."
-    exit 1
-}
+# Set the directory where HandBrakeCLI will be stored
+cd /app/custom
 
-# Check if the --uninstall option is provided
-if [ "$1" == "--uninstall" ]; then
-    echo "Uninstalling HandBrake..."
-    if apt-get remove -y handbrake-cli; then
-        echo "HandBrake successfully uninstalled."
-        exit 0
-    else
-        handle_error
-    fi
+HANDBRAKE_DIR="handbrake"
+HANDBRAKE_DIR_FULL="/app/custom/handbrake"
+mkdir -p "$HANDBRAKE_DIR"
+mkdir -p "$HANDBRAKE_DIR/tmp"
+mkdir -p "$HANDBRAKE_DIR/bin"
+
+# Move to the temporary directory
+cd "$HANDBRAKE_DIR/tmp"
+
+# Download the Debian/Ubuntu package
+echo "Downloading HandBrakeCLI Debian package..."
+apt-get download handbrake-cli
+
+# Extract the package
+echo "Extracting HandBrakeCLI from package..."
+dpkg-deb -x handbrake-cli*.deb ./extracted
+
+cd "$HANDBRAKE_DIR_FULL"
+# Copy the HandBrakeCLI binary and its dependencies
+cp $HANDBRAKE_DIR_FULL/tmp/extracted/usr/bin/HandBrakeCLI "$HANDBRAKE_DIR_FULL/bin/HandBrakeCLI"
+
+# Make sure it's executable
+chmod +x "$HANDBRAKE_DIR_FULL/bin/HandBrakeCLI"
+
+# Create a wrapper script that sets up any necessary environment variables and paths
+cat > "$HANDBRAKE_DIR_FULL/handbrake-wrapper.sh" << 'EOF'
+#!/bin/bash
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+export LD_LIBRARY_PATH="$SCRIPT_DIR/lib:$LD_LIBRARY_PATH"
+"$SCRIPT_DIR/bin/HandBrakeCLI" "$@"
+EOF
+
+chmod +x "$HANDBRAKE_DIR_FULL/handbrake-wrapper.sh"
+
+# Check if any shared libraries are needed
+echo "Checking for needed libraries..."
+NEEDED_LIBS=$(ldd "$HANDBRAKE_DIR_FULL/bin/HandBrakeCLI" | grep "not found")
+
+if [ -n "$NEEDED_LIBS" ]; then
+    echo "Found missing libraries. Installing them locally..."
+    mkdir -p "$HANDBRAKE_DIR_FULL/lib"
+    
+    # Extract required libraries from package dependencies
+    apt-get download $(apt-cache depends --recurse --no-recommends --no-suggests \
+              --no-conflicts --no-breaks --no-replaces --no-enhances \
+              handbrake-cli | grep "^\w" | sort -u)
+    
+    for pkg in *.deb; do
+        dpkg-deb -x "$pkg" ./extracted
+    done
+    
+    # Find and copy all shared libraries to our lib directory
+    find ./extracted -name "*.so*" -exec cp -L {} "$HANDBRAKE_DIR_FULL/lib/" \;
 fi
 
-# Check if HandBrake is installed
-if command -v HandBrakeCLI &>/dev/null; then
-    echo "HandBrake is already installed."
-    exit 0
-fi
+# Clean up
+rm -rf "$HANDBRAKE_DIR_FULL/tmp"
 
-echo "HandBrake is not installed. Installing..."
-
-# Update package lists
-if ! apt update; then
-    handle_error
-fi
-
-# Install HandBrake CLI
-if ! apt install -y handbrake-cli; then
-    handle_error
-fi
-
-echo "Installation complete."
-
-# Verify installation
-if command -v HandBrakeCLI &>/dev/null; then
-    echo "HandBrake successfully installed."
-    exit 0
-else
-    echo "Failed to install HandBrake."
-    exit 1
-fi
+echo "HandBrakeCLI has been installed to $HANDBRAKE_DIR_FULL"
+echo "Use $HANDBRAKE_DIR_FULL/handbrake-wrapper.sh as your HandBrakeCLI executable in FileFlows"
+echo "To test, run: $HANDBRAKE_DIR_FULL/handbrake-wrapper.sh --version"

@@ -4,7 +4,7 @@
 cd /app/custom
 
 HANDBRAKE_DIR="handbrake"
-HANDBRAKE_DIR_FULL="/app/custom/handbrake"
+HANDBRAKE_DIR_FULL="/app/common/handbrake"
 mkdir -p "$HANDBRAKE_DIR"
 mkdir -p "$HANDBRAKE_DIR/tmp"
 mkdir -p "$HANDBRAKE_DIR/bin"

@@ -6,6 +6,7 @@
  * @param {string} MaxResolution Maximum resolution for the output video (e.g., 1080, 720)
  * @param {string} Quality Quality setting for encoding (e.g., 22, 28)
  * @param {string} ExtraEncodingOptions Additional encoding options to pass to HandBrakeCLI (e.g., "preset=p1:profile=main10:rc=vbr_hq")
+ * @param {string} FrameRate Set encode FPS
  * @output Conversion Successful
  * @output Conversion Failed
  */
@@ -27,7 +28,7 @@ function Script() {
         '-o',
         output,
         '--preset-import-file',
-        '/app/Data/rais.json',
+        '/app/common/rais.json',
         '-Z',
         PresetName,
         '-q',
@@ -45,6 +46,13 @@ function Script() {
         // HandBrakeCLI uses the --height or --width option to set resolution
         // Here, we'll set the height based on MaxResolution
         argumentList.push('--height', MaxResolution);
+    }
+
+    // Handle Max Resolution if specified
+    if (FrameRate) {
+        // HandBrakeCLI uses the --height or --width option to set resolution
+        // Here, we'll set the height based on MaxResolution
+        argumentList.push('--rate', FrameRate);
     }
 
     // Log the command for debugging purposes
